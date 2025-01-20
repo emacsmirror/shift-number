@@ -1,12 +1,14 @@
-;;; shift-number.el --- Increase/decrease the number at point
+;;; shift-number.el --- Increase/decrease the number at point -*- lexical-binding: t -*-
 
 ;; Copyright © 2016–2017 Alex Kost
 
 ;; Author: Alex Kost <alezost@gmail.com>
-;; Created: 12 Apr 2016
-;; Version: 0.1
+
 ;; URL: https://github.com/alezost/shift-number.el
 ;; Keywords: convenience
+;; Created: 12 Apr 2016
+;; Version: 0.1
+;; Package-Requires: ((emacs "24.1"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
