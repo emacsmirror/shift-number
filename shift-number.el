@@ -31,8 +31,7 @@
   "Increase or decrease the number at point."
   :group 'convenience)
 
-(defcustom shift-number-regexp
-  (rx (group (one-or-more num)))
+(defcustom shift-number-regexp (rx (group (one-or-more num)))
   "Regexp for `shift-number' function.
 The first parenthesized expression must match the number."
   :type 'regexp
@@ -54,10 +53,10 @@ The first parenthesized expression must match the number."
   (save-excursion
     (let ((pos (point))
           (end (line-end-position))
-          found exit)
+          found
+          exit)
       (beginning-of-line)
-      (while (and (not (or exit found))
-                  (re-search-forward regexp end t))
+      (while (and (not (or exit found)) (re-search-forward regexp end t))
         (cond
          ((> (match-beginning 0) pos)
           (setq exit t))
@@ -77,15 +76,22 @@ the current line and change it."
     (or (shift-number-in-regexp-p shift-number-regexp)
         (re-search-forward shift-number-regexp (line-end-position) t)
         (error "No number on the current line"))
-    (let* ((beg         (match-beginning 1))
-           (end         (match-end       1))
-           (sign        (and shift-number-negative
-                             (if (eq ?- (char-before beg)) -1 1)))
+    (let* ((beg (match-beginning 1))
+           (end (match-end 1))
+           (sign
+            (and shift-number-negative
+                 (if (eq ?- (char-before beg))
+                     -1
+                   1)))
            (old-num-str (buffer-substring-no-properties beg end))
-           (old-num     (string-to-number old-num-str))
-           (new-num     (+ old-num (* sign n)))
+           (old-num (string-to-number old-num-str))
+           (new-num (+ old-num (* sign n)))
            (new-num-str (number-to-string (abs new-num))))
-      (delete-region (if (eq sign -1) (1- beg) beg) end)
+      (delete-region
+       (if (eq sign -1)
+           (1- beg)
+         beg)
+       end)
 
       ;; Handle sign flipping & negative numbers.
       (when (< new-num 0)
@@ -96,8 +102,7 @@ the current line and change it."
       ;; If there are leading zeros, preserve them keeping the same
       ;; length of the original number.
       (when (string-match-p "\\`0" old-num-str)
-        (let ((len-diff (- (length old-num-str)
-                           (length new-num-str))))
+        (let ((len-diff (- (length old-num-str) (length new-num-str))))
           (when (> len-diff 0)
             (insert (make-string len-diff ?0)))))
       (insert new-num-str)
@@ -113,8 +118,7 @@ the current line and change it."
 
       (goto-char old-pos)
       (when shift-number-display-message
-        (message "Number %d has been changed to number %d."
-                 old-num new-num)))))
+        (message "Number %d has been changed to number %d." old-num new-num)))))
 
 ;;;###autoload
 (defun shift-number-up (&optional arg)
@@ -129,5 +133,8 @@ the current line and change it."
   (shift-number (- arg)))
 
 (provide 'shift-number)
-
+;; Local Variables:
+;; fill-column: 99
+;; indent-tabs-mode: nil
+;; End:
 ;;; shift-number.el ends here
