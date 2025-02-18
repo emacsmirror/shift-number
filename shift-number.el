@@ -47,7 +47,7 @@ The first parenthesized expression must match the number."
   :type 'boolean
   :group 'shift-number)
 
-(defun shift-number-in-regexp-p (regexp)
+(defun shift-number--in-regexp-p (regexp)
   "Return non-nil, if point is inside REGEXP on the current line."
   ;; The code originates from `org-at-regexp-p'.
   (save-excursion
@@ -64,7 +64,7 @@ The first parenthesized expression must match the number."
           (setq found t))))
       found)))
 
-(defun shift-number (n)
+(defun shift-number--impl (n)
   "Change the number at point by N.
 If there is no number at point, search forward till the end of
 the current line and change it."
@@ -73,7 +73,7 @@ the current line and change it."
   ;; the beginning of the number.  Instead, the point is saved and
   ;; restored later.
   (let ((old-pos (point)))
-    (or (shift-number-in-regexp-p shift-number-regexp)
+    (or (shift-number--in-regexp-p shift-number-regexp)
         (re-search-forward shift-number-regexp (line-end-position) t)
         (error "No number on the current line"))
     (let* ((beg (match-beginning 1))
@@ -128,13 +128,13 @@ the current line and change it."
 (defun shift-number-up (&optional arg)
   "Increase the number at point (or on the current line) by ARG."
   (interactive "p")
-  (shift-number arg))
+  (shift-number--impl arg))
 
 ;;;###autoload
 (defun shift-number-down (&optional arg)
   "Decrease the number at point (or on the current line) by ARG."
   (interactive "p")
-  (shift-number (- arg)))
+  (shift-number--impl (- arg)))
 
 (provide 'shift-number)
 ;; Local Variables:
