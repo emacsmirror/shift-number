@@ -31,7 +31,7 @@
   "Increase or decrease the number at point."
   :group 'convenience)
 
-(defcustom shift-number-regexp (rx (group (one-or-more num)))
+(defcustom shift-number-regexp "\\([[:digit:]]+\\)"
   "Regexp for `shift-number' function.
 The first parenthesized expression must match the number."
   :type 'regexp
