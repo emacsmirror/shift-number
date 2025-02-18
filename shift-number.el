@@ -80,17 +80,21 @@ the current line and change it."
            (end (match-end 1))
            (sign
             (and shift-number-negative
-                 (if (eq ?- (char-before beg))
-                     -1
-                   1)))
+                 (cond
+                  ((eq ?- (char-before beg))
+                   -1)
+                  (t
+                   1))))
            (old-num-str (buffer-substring-no-properties beg end))
            (old-num (string-to-number old-num-str))
            (new-num (+ old-num (* sign n)))
            (new-num-str (number-to-string (abs new-num))))
       (delete-region
-       (if (eq sign -1)
-           (1- beg)
-         beg)
+       (cond
+        ((eq sign -1)
+         (1- beg))
+        (t
+         beg))
        end)
 
       ;; Handle sign flipping & negative numbers.
