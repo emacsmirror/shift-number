@@ -47,6 +47,56 @@ The first parenthesized expression must match the number."
   :type 'boolean
   :group 'shift-number)
 
+(defun shift-number--replace-in-region (str beg end)
+  "Utility to replace region from BEG to END with STR.
+Return the region replaced."
+  (declare (important-return-value nil))
+
+  (let ((len (length str))
+        (i-beg nil)
+        (i-end nil)
+        (i-end-ofs nil))
+
+    ;; Check for skip end.
+    (let ((i 0))
+      (let ((len-test (min (- end beg) len)))
+        (while (< i len-test)
+          (let ((i-next (1+ i)))
+            (cond
+             ((eq (aref str (- len i-next)) (char-after (- end i-next)))
+              (setq i i-next))
+             (t ; Break.
+              (setq len-test i))))))
+      (unless (zerop i)
+        (setq i-end (- len i))
+        (setq len (- len i))
+        (setq end (- end i))
+        (setq i-end-ofs i)))
+
+    ;; Check for skip start.
+    (let ((i 0))
+      (let ((len-test (min (- end beg) len)))
+        (while (< i len-test)
+          (cond
+           ((eq (aref str i) (char-after (+ beg i)))
+            (setq i (1+ i)))
+           (t ; Break.
+            (setq len-test i)))))
+      (unless (zerop i)
+        (setq i-beg i)
+        (setq beg (+ beg i))))
+
+    (when (or i-beg i-end)
+      (setq str (substring str (or i-beg 0) (or i-end len))))
+
+    (goto-char beg)
+    (delete-region beg end)
+    (insert str)
+    (when i-end-ofs
+      ;; Leave the cursor where it would be if the end wasn't clipped.
+      (goto-char (+ (point) i-end-ofs)))
+    (cons beg (+ beg (length str)))))
+
 (defun shift-number--in-regexp-p (regexp)
   "Return non-nil, if point is inside REGEXP on the current line."
   ;; The code originates from `org-at-regexp-p'.
@@ -94,31 +144,42 @@ the current line and change it."
                    -1)
                   (t
                    1))))
+           (replace-bounds
+            (cons
+             (cond
+              ((eq sign -1)
+               (1- beg))
+              (t
+               beg))
+             end))
+
            (old-num-str (buffer-substring-no-properties beg end))
            (old-num (string-to-number old-num-str))
            (new-num (+ old-num (* sign n)))
+
+           (new-num-sign-str "")
+           (new-num-leading-str "")
            (new-num-str (number-to-string (abs new-num))))
-      (delete-region
-       (cond
-        ((eq sign -1)
-         (1- beg))
-        (t
-         beg))
-       end)
 
       ;; Handle sign flipping & negative numbers.
       (when (< new-num 0)
         (setq sign (- sign)))
       (when (eq sign -1)
-        (insert "-"))
+        (setq new-num-sign-str "-"))
 
       ;; If there are leading zeros, preserve them keeping the same
       ;; length of the original number.
       (when (string-match-p "\\`0" old-num-str)
         (let ((len-diff (- (length old-num-str) (length new-num-str))))
           (when (> len-diff 0)
-            (insert (make-string len-diff ?0)))))
-      (insert new-num-str)
+            (setq new-num-leading-str (make-string len-diff ?0)))))
+
+      ;; Prefer this over delete+insert so as to reduce the undo overhead
+      ;; when numbers are mostly the same.
+      (shift-number--replace-in-region
+       (concat new-num-sign-str new-num-leading-str new-num-str)
+       (car replace-bounds)
+       (cdr replace-bounds))
 
       (cond
        ;; If the point was exactly at the end, keep it there.
