@@ -92,16 +92,14 @@ Return the region replaced."
       (goto-char (+ (point) i-end-ofs)))
     (cons beg (+ beg (length str)))))
 
-(defun shift-number--in-regexp-p (regexp)
-  "Return non-nil, if point is inside REGEXP on the current line."
+(defun shift-number--in-regexp-p (regexp pos limit-beg limit-end)
+  "Return non-nil, if POS is inside REGEXP on the current line."
   ;; The code originates from `org-at-regexp-p'.
   (save-excursion
-    (let ((pos (point))
-          (end (line-end-position))
-          found
-          exit)
-      (beginning-of-line)
-      (while (and (not (or exit found)) (re-search-forward regexp end t))
+    (let ((found nil)
+          (exit nil))
+      (goto-char limit-beg)
+      (while (and (not (or exit found)) (re-search-forward regexp limit-end t))
         (cond
          ((> (match-beginning 0) pos)
           (setq exit t))
@@ -109,95 +107,147 @@ Return the region replaced."
           (setq found t))))
       found)))
 
-(defun shift-number--impl (n)
+(defun shift-number--impl (n pos limit-beg limit-end)
   "Change the number at point by N.
 If there is no number at point, search forward till the end of
-the current line and change it."
+the current line and change it.
+
+Search backwards from LIMIT-BEG for a number overlapping POS.
+Otherwise search forward limited by LIMIT-END."
   ;; The whole number is removed and a new number is inserted in its
   ;; place, so `save-excursion' is not used, as it will put the point at
   ;; the beginning of the number.  Instead, the point is saved and
   ;; restored later.
-  (let ((old-pos (point))
-        (num-bounds
+  (let ((num-bounds
          (save-match-data
            (cond
-            ((or (shift-number--in-regexp-p shift-number-regexp)
-                 (re-search-forward shift-number-regexp (line-end-position)))
+            ((or (and (< limit-beg pos)
+                      (shift-number--in-regexp-p shift-number-regexp pos limit-beg limit-end))
+                 (re-search-forward shift-number-regexp limit-end t))
              (cons (match-beginning 1) (match-end 1)))
             (t
              nil)))))
 
-    (unless num-bounds
+    (cond
+     (num-bounds
+      (let* ((beg (car num-bounds))
+             (end (cdr num-bounds))
+             (sign
+              (and shift-number-negative
+                   (cond
+                    ((eq ?- (char-before beg))
+                     -1)
+                    (t
+                     1))))
+             (old-bounds
+              (cons
+               (cond
+                ((eq sign -1)
+                 (1- beg))
+                (t
+                 beg))
+               end))
+
+             (old-num-str (buffer-substring-no-properties beg end))
+             (old-num (string-to-number old-num-str))
+             (new-num (+ old-num (* sign n)))
+
+             (new-num-sign-str "")
+             (new-num-leading-str "")
+             (new-num-str (number-to-string (abs new-num))))
+
+        ;; Handle sign flipping & negative numbers.
+        (when (< new-num 0)
+          (setq sign (- sign)))
+        (when (eq sign -1)
+          (setq new-num-sign-str "-"))
+
+        ;; If there are leading zeros, preserve them keeping the same
+        ;; length of the original number.
+        (when (string-match-p "\\`0" old-num-str)
+          (let ((len-diff (- (length old-num-str) (length new-num-str))))
+            (when (> len-diff 0)
+              (setq new-num-leading-str (make-string len-diff ?0)))))
+
+        ;; Prefer this over delete+insert so as to reduce the undo overhead
+        ;; when numbers are mostly the same.
+        (let* ((new-num-str-full (concat new-num-sign-str new-num-leading-str new-num-str))
+               (new-bounds (cons (car old-bounds) (+ (car old-bounds) (length new-num-str-full)))))
+
+          (shift-number--replace-in-region new-num-str-full (car old-bounds) (cdr old-bounds))
+
+          ;; Result.
+          (cons old-bounds new-bounds))))
+     (t
+      nil))))
+
+(defun shift-number--on-line (n)
+  "Adjust the number N on the current line."
+  (let* ((old-pos (point))
+         (bounds-pair
+          (shift-number--impl n old-pos (line-beginning-position) (line-end-position))))
+
+    (unless bounds-pair
       (error "No number on the current line"))
 
-    (let* ((beg (car num-bounds))
-           (end (cdr num-bounds))
-           (sign
-            (and shift-number-negative
-                 (cond
-                  ((eq ?- (char-before beg))
-                   -1)
-                  (t
-                   1))))
-           (replace-bounds
-            (cons
-             (cond
-              ((eq sign -1)
-               (1- beg))
-              (t
-               beg))
-             end))
-
-           (old-num-str (buffer-substring-no-properties beg end))
-           (old-num (string-to-number old-num-str))
-           (new-num (+ old-num (* sign n)))
-
-           (new-num-sign-str "")
-           (new-num-leading-str "")
-           (new-num-str (number-to-string (abs new-num))))
-
-      ;; Handle sign flipping & negative numbers.
-      (when (< new-num 0)
-        (setq sign (- sign)))
-      (when (eq sign -1)
-        (setq new-num-sign-str "-"))
-
-      ;; If there are leading zeros, preserve them keeping the same
-      ;; length of the original number.
-      (when (string-match-p "\\`0" old-num-str)
-        (let ((len-diff (- (length old-num-str) (length new-num-str))))
-          (when (> len-diff 0)
-            (setq new-num-leading-str (make-string len-diff ?0)))))
-
-      ;; Prefer this over delete+insert so as to reduce the undo overhead
-      ;; when numbers are mostly the same.
-      (shift-number--replace-in-region
-       (concat new-num-sign-str new-num-leading-str new-num-str)
-       (car replace-bounds)
-       (cdr replace-bounds))
+    (let* ((old-bounds (car bounds-pair))
+           (new-bounds (cdr bounds-pair))
+           (old-end (cdr old-bounds))
+           (new-end (cdr new-bounds)))
 
       (cond
        ;; If the point was exactly at the end, keep it there.
-       ((eq old-pos end)
-        (setq old-pos (point)))
+       ((eq old-pos old-end)
+        (setq old-pos new-end))
        ;; Prevent the change causing the cursor to "leave" the number,
        ;; allowing for further adjustments.
        (t
-        (setq old-pos (min (point) old-pos))))
+        (setq old-pos (min new-end old-pos))))
 
-      (goto-char old-pos))))
+      (goto-char old-pos)
+
+      new-end)))
+
+(defun shift-number--on-region-impl (n region-beg region-end)
+  "Shift the numbers N in the region defined.
+REGION-BEG & REGION-END define the region."
+  (save-excursion
+    (let ((bounds-pair nil))
+      (goto-char region-beg)
+      (while (and (setq bounds-pair (shift-number--impl n region-beg region-beg region-end)))
+        (let* ((old-bounds (car bounds-pair))
+               (new-bounds (cdr bounds-pair))
+               (old-end (cdr old-bounds))
+               (new-end (cdr new-bounds)))
+
+          ;; Keep contracting the region forward & updating it's end-points.
+          (setq region-beg new-end)
+          (setq region-end (+ region-end (- new-end old-end)))))))
+  region-end)
+
+(defun shift-number--on-region (n)
+  "Shift the numbers N on the current region."
+  (shift-number--on-region-impl n (region-beginning) (region-end)))
 
 ;;;###autoload
 (defun shift-number-up (&optional arg)
   "Increase the number at point (or on the current line) by ARG."
   (interactive "p")
-  (shift-number--impl arg))
+  (cond
+   ((region-active-p)
+    (shift-number--on-region arg))
+   (t
+    (shift-number--on-line arg))))
 
 ;;;###autoload
 (defun shift-number-down (&optional arg)
   "Decrease the number at point (or on the current line) by ARG."
   (interactive "p")
-  (shift-number--impl (- arg)))
+  (cond
+   ((region-active-p)
+    (shift-number--on-region (- arg)))
+   (t
+    (shift-number--on-line (- arg)))))
 
 (provide 'shift-number)
 ;; Local Variables:
