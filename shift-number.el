@@ -42,6 +42,8 @@ The first parenthesized expression must match the number."
   :type 'boolean
   :group 'shift-number)
 
+(declare-function apply-on-rectangle "rect")
+
 (defun shift-number--replace-in-region (str beg end)
   "Utility to replace region from BEG to END with STR.
 Return the region replaced."
@@ -229,11 +231,22 @@ REGION-BEG & REGION-END define the region."
   "Shift the numbers N on the current region."
   (shift-number--on-region-impl n (region-beginning) (region-end)))
 
+(defun shift-number--on-rectangle (n)
+  "Shift the numbers N on the current region."
+  (let ((shift-fn `(lambda (beg end) (save-excursion (shift-number--on-region-impl ,n beg end)))))
+    (apply-on-rectangle
+     ;; Make the values global.
+     `(lambda (beg end) (funcall ,shift-fn (+ (point) beg) (+ (point) end)))
+     (region-beginning)
+     (region-end))))
+
 ;;;###autoload
 (defun shift-number-up (&optional arg)
   "Increase the number at point (or on the current line) by ARG."
   (interactive "p")
   (cond
+   ((bound-and-true-p rectangle-mark-mode)
+    (shift-number--on-rectangle arg))
    ((region-active-p)
     (shift-number--on-region arg))
    (t
@@ -244,6 +257,8 @@ REGION-BEG & REGION-END define the region."
   "Decrease the number at point (or on the current line) by ARG."
   (interactive "p")
   (cond
+   ((bound-and-true-p rectangle-mark-mode)
+    (shift-number--on-rectangle (- arg)))
    ((region-active-p)
     (shift-number--on-region (- arg)))
    (t
