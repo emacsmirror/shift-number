@@ -37,11 +37,6 @@ The first parenthesized expression must match the number."
   :type 'regexp
   :group 'shift-number)
 
-(defcustom shift-number-display-message nil
-  "If non-nil, display a message after shifting the current number."
-  :type 'boolean
-  :group 'shift-number)
-
 (defcustom shift-number-negative t
   "If non-nil, support negative numbers."
   :type 'boolean
@@ -190,9 +185,7 @@ the current line and change it."
        (t
         (setq old-pos (min (point) old-pos))))
 
-      (goto-char old-pos)
-      (when shift-number-display-message
-        (message "Number %d has been changed to number %d." old-num new-num)))))
+      (goto-char old-pos))))
 
 ;;;###autoload
 (defun shift-number-up (&optional arg)
