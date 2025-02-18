@@ -72,12 +72,21 @@ the current line and change it."
   ;; place, so `save-excursion' is not used, as it will put the point at
   ;; the beginning of the number.  Instead, the point is saved and
   ;; restored later.
-  (let ((old-pos (point)))
-    (or (shift-number--in-regexp-p shift-number-regexp)
-        (re-search-forward shift-number-regexp (line-end-position) t)
-        (error "No number on the current line"))
-    (let* ((beg (match-beginning 1))
-           (end (match-end 1))
+  (let ((old-pos (point))
+        (num-bounds
+         (save-match-data
+           (cond
+            ((or (shift-number--in-regexp-p shift-number-regexp)
+                 (re-search-forward shift-number-regexp (line-end-position)))
+             (cons (match-beginning 1) (match-end 1)))
+            (t
+             nil)))))
+
+    (unless num-bounds
+      (error "No number on the current line"))
+
+    (let* ((beg (car num-bounds))
+           (end (cdr num-bounds))
            (sign
             (and shift-number-negative
                  (cond
