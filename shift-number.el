@@ -5,7 +5,7 @@
 
 ;; Author: Alex Kost <alezost@gmail.com>
 
-;; URL: https://github.com/alezost/shift-number.el
+;; URL: https://codeberg.org/ideasman42/emacs-shift-number
 ;; Keywords: convenience
 ;; Created: 12 Apr 2016
 ;; Version: 0.1
