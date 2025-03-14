@@ -40,6 +40,10 @@ The first parenthesized expression must match the number."
   "If non-nil, support negative numbers."
   :type 'boolean)
 
+(defcustom shift-number-motion nil
+  "If non-nil, move the point to the end of the number."
+  :type 'boolean)
+
 (declare-function apply-on-rectangle "rect")
 
 (defun shift-number--replace-in-region (str beg end)
@@ -205,6 +209,9 @@ Otherwise search forward limited by LIMIT-END."
         (setq old-pos (min new-end old-pos))))
 
       (goto-char old-pos)
+
+      (when shift-number-motion
+        (goto-char new-end))
 
       new-end)))
 
