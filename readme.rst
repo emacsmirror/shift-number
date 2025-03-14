@@ -54,6 +54,15 @@ You may bind some keys to these commands in a usual manner, for example:
    (global-set-key (kbd "M-_") 'shift-number-down)
 
 
+Custom Variables
+----------------
+
+``shift-number-motion``: ``nil``
+   When non-nil, move the cursor to the end of the number.
+``shift-number-negative``: ``t``
+   When non-nil, support negative numbers.
+
+
 Similar packages
 ================
 
