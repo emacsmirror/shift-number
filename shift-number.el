@@ -27,6 +27,10 @@
 
 ;;; Code:
 
+
+;; ---------------------------------------------------------------------------
+;; Custom Variables
+
 (defgroup shift-number nil
   "Increase or decrease the number at point."
   :group 'convenience)
@@ -45,6 +49,10 @@ The first parenthesized expression must match the number."
   :type 'boolean)
 
 (declare-function apply-on-rectangle "rect")
+
+
+;; ---------------------------------------------------------------------------
+;; Private Functions
 
 (defun shift-number--replace-in-region (str beg end)
   "Utility to replace region from BEG to END with STR.
@@ -244,6 +252,10 @@ REGION-BEG & REGION-END define the region."
      `(lambda (beg end) (funcall ,shift-fn (+ (point) beg) (+ (point) end)))
      (region-beginning)
      (region-end))))
+
+
+;; ---------------------------------------------------------------------------
+;; Public Functions
 
 ;;;###autoload
 (defun shift-number-up (&optional arg)
