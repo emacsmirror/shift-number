@@ -34,13 +34,11 @@
 (defcustom shift-number-regexp "\\([[:digit:]]+\\)"
   "Regexp for `shift-number' function.
 The first parenthesized expression must match the number."
-  :type 'regexp
-  :group 'shift-number)
+  :type 'regexp)
 
 (defcustom shift-number-negative t
   "If non-nil, support negative numbers."
-  :type 'boolean
-  :group 'shift-number)
+  :type 'boolean)
 
 (declare-function apply-on-rectangle "rect")
 
