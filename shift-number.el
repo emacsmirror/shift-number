@@ -253,6 +253,16 @@ REGION-BEG & REGION-END define the region."
      (region-beginning)
      (region-end))))
 
+(defun shift-number--on-context (n)
+  "Manipulate numbers in the current region or line by N."
+  (cond
+   ((bound-and-true-p rectangle-mark-mode)
+    (shift-number--on-rectangle n))
+   ((region-active-p)
+    (shift-number--on-region n))
+   (t
+    (shift-number--on-line n))))
+
 
 ;; ---------------------------------------------------------------------------
 ;; Public Functions
@@ -261,25 +271,13 @@ REGION-BEG & REGION-END define the region."
 (defun shift-number-up (&optional arg)
   "Increase the number at point (or on the current line) by ARG."
   (interactive "p")
-  (cond
-   ((bound-and-true-p rectangle-mark-mode)
-    (shift-number--on-rectangle arg))
-   ((region-active-p)
-    (shift-number--on-region arg))
-   (t
-    (shift-number--on-line arg))))
+  (shift-number--on-context arg))
 
 ;;;###autoload
 (defun shift-number-down (&optional arg)
   "Decrease the number at point (or on the current line) by ARG."
   (interactive "p")
-  (cond
-   ((bound-and-true-p rectangle-mark-mode)
-    (shift-number--on-rectangle (- arg)))
-   ((region-active-p)
-    (shift-number--on-region (- arg)))
-   (t
-    (shift-number--on-line (- arg)))))
+  (shift-number--on-context (- arg)))
 
 (provide 'shift-number)
 ;; Local Variables:
