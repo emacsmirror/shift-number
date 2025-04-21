@@ -270,13 +270,13 @@ REGION-BEG & REGION-END define the region."
 ;;;###autoload
 (defun shift-number-up (&optional arg)
   "Increase the number at point (or on the current line) by ARG."
-  (interactive "p")
+  (interactive "*p")
   (shift-number--on-context arg))
 
 ;;;###autoload
 (defun shift-number-down (&optional arg)
   "Decrease the number at point (or on the current line) by ARG."
-  (interactive "p")
+  (interactive "*p")
   (shift-number--on-context (- arg)))
 
 (provide 'shift-number)
