@@ -134,22 +134,39 @@ Otherwise search forward limited by LIMIT-END."
   ;; place, so `save-excursion' is not used, as it will put the point at
   ;; the beginning of the number.  Instead, the point is saved and
   ;; restored later.
-  (let ((num-bounds
-         (save-match-data
-           (cond
-            ((or (and (< limit-beg pos)
-                      (shift-number--in-regexp-p shift-number-regexp pos limit-beg limit-end))
-                 (re-search-forward shift-number-regexp limit-end t))
-             (cons (match-beginning 1) (match-end 1)))
-            (t
-             nil)))))
+  (let ((num-bounds nil)
+        (has-sign nil))
+
+    (save-match-data
+      (when (or (and (< limit-beg pos)
+                     (shift-number--in-regexp-p shift-number-regexp pos limit-beg limit-end))
+                (re-search-forward shift-number-regexp limit-end t))
+        (let ((beg (match-beginning 1))
+              (end (match-end 1)))
+          (setq num-bounds (cons beg end))
+
+          ;; Only detect a sign when negative numbers are supported.
+          (when shift-number-negative
+            (let ((ch (char-before beg)))
+              (cond
+               ((eq ?- ch)
+                (setq has-sign t))
+               ((eq ?+ ch)
+                (setq has-sign t)))
+
+              (when has-sign
+                (cond
+                 ((eq ?- ch)
+                  -1)
+                 (t
+                  1))))))))
 
     (cond
      (num-bounds
       (let* ((beg (car num-bounds))
              (end (cdr num-bounds))
              ;; Take care, nil when negative unsupported.
-             (sign
+             (old-sign
               (and shift-number-negative
                    (cond
                     ((eq ?- (char-before beg))
@@ -159,12 +176,8 @@ Otherwise search forward limited by LIMIT-END."
              (old-bounds
               (cons
                (cond
-                (shift-number-negative
-                 (cond
-                  ((eq sign -1)
-                   (1- beg))
-                  (t
-                   beg)))
+                (has-sign
+                 (1- beg))
                 (t
                  beg))
                end))
@@ -174,11 +187,12 @@ Otherwise search forward limited by LIMIT-END."
              (new-num
               (cond
                (shift-number-negative
-                (+ old-num (* sign n)))
+                (+ old-num (* old-sign n)))
                (t
                 ;; It doesn't make sense to add a "sign" if further increments ignore it.
                 (max 0 (+ old-num n)))))
 
+             (new-sign old-sign)
              (new-num-sign-str "")
              (new-num-leading-str "")
              (new-num-str (number-to-string (abs new-num))))
@@ -186,9 +200,14 @@ Otherwise search forward limited by LIMIT-END."
         ;; Handle sign flipping & negative numbers.
         (when shift-number-negative
           (when (< new-num 0)
-            (setq sign (- sign)))
-          (when (eq sign -1)
-            (setq new-num-sign-str "-")))
+            (setq new-sign (- old-sign)))
+
+          (cond
+           ((eq new-sign -1)
+            (setq new-num-sign-str "-"))
+           ((and has-sign (eq old-sign 1))
+            ;; If a literal `+' was present, don't remove it.
+            (setq new-num-sign-str "+"))))
 
         ;; If there are leading zeros, preserve them keeping the same
         ;; length of the original number.
