@@ -148,6 +148,7 @@ Otherwise search forward limited by LIMIT-END."
      (num-bounds
       (let* ((beg (car num-bounds))
              (end (cdr num-bounds))
+             ;; Take care, nil when negative unsupported.
              (sign
               (and shift-number-negative
                    (cond
@@ -158,25 +159,36 @@ Otherwise search forward limited by LIMIT-END."
              (old-bounds
               (cons
                (cond
-                ((eq sign -1)
-                 (1- beg))
+                (shift-number-negative
+                 (cond
+                  ((eq sign -1)
+                   (1- beg))
+                  (t
+                   beg)))
                 (t
                  beg))
                end))
 
              (old-num-str (buffer-substring-no-properties beg end))
              (old-num (string-to-number old-num-str))
-             (new-num (+ old-num (* sign n)))
+             (new-num
+              (cond
+               (shift-number-negative
+                (+ old-num (* sign n)))
+               (t
+                ;; It doesn't make sense to add a "sign" if further increments ignore it.
+                (max 0 (+ old-num n)))))
 
              (new-num-sign-str "")
              (new-num-leading-str "")
              (new-num-str (number-to-string (abs new-num))))
 
         ;; Handle sign flipping & negative numbers.
-        (when (< new-num 0)
-          (setq sign (- sign)))
-        (when (eq sign -1)
-          (setq new-num-sign-str "-"))
+        (when shift-number-negative
+          (when (< new-num 0)
+            (setq sign (- sign)))
+          (when (eq sign -1)
+            (setq new-num-sign-str "-")))
 
         ;; If there are leading zeros, preserve them keeping the same
         ;; length of the original number.
