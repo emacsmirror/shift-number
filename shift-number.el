@@ -157,7 +157,7 @@ Otherwise search forward limited by LIMIT-END."
                 (setq has-sign t)))
 
               ;; Ignore the sign when immediately preceded by a number, e.g. `123-456'.
-              (when has-sign
+              (when (and has-sign (< limit-beg (1- beg)))
                 (save-excursion
                   (goto-char (1- beg))
                   (when (looking-back shift-number-regexp limit-beg)
