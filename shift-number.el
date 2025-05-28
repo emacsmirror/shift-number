@@ -35,11 +35,6 @@
   "Increase or decrease the number at point."
   :group 'convenience)
 
-(defcustom shift-number-regexp "\\([[:digit:]]+\\)"
-  "Regexp for `shift-number' function.
-The first parenthesized expression must match the number."
-  :type 'regexp)
-
 (defcustom shift-number-negative t
   "If non-nil, support negative numbers."
   :type 'boolean)
@@ -50,6 +45,12 @@ The first parenthesized expression must match the number."
 
 (declare-function apply-on-rectangle "rect")
 
+;; ---------------------------------------------------------------------------
+;; Private Variables/Constants
+
+;; Regexp for `shift-number' function.
+;; The first parenthesized expression must match the number.
+(defconst shift-number--regexp "\\([[:digit:]]+\\)")
 
 ;; ---------------------------------------------------------------------------
 ;; Private Functions
@@ -141,8 +142,8 @@ Otherwise search forward limited by LIMIT-END."
 
     (save-match-data
       (when (or (and (< limit-beg pos)
-                     (shift-number--in-regexp-p shift-number-regexp pos limit-beg limit-end))
-                (re-search-forward shift-number-regexp limit-end t))
+                     (shift-number--in-regexp-p shift-number--regexp pos limit-beg limit-end))
+                (re-search-forward shift-number--regexp limit-end t))
         (let ((beg (match-beginning 1))
               (end (match-end 1)))
           (setq num-bounds (cons beg end))
@@ -160,7 +161,7 @@ Otherwise search forward limited by LIMIT-END."
               (when (and has-sign (< limit-beg (1- beg)))
                 (save-excursion
                   (goto-char (1- beg))
-                  (when (looking-back shift-number-regexp limit-beg)
+                  (unless (zerop (skip-chars-backward "0-9" (- beg 2)))
                     ;; Don't allow negative numbers otherwise
                     ;; `1-0' would subtract zero to make `1--0'.
                     (setq use-sign nil)
