@@ -146,7 +146,7 @@ Otherwise search forward limited by LIMIT-END."
           (setq num-bounds (cons beg end))
 
           ;; Only detect a sign when negative numbers are supported.
-          (when shift-number-negative
+          (when (and shift-number-negative (< limit-beg beg))
             (let ((ch (char-before beg)))
               (cond
                ((eq ?- ch)
