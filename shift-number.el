@@ -56,6 +56,12 @@ The `mark' is set the the beginning of the number."
 ;; ---------------------------------------------------------------------------
 ;; Private Functions
 
+(defmacro shift-number--swap-vars (i j)
+  `(setq ,i
+         (prog1 ,j
+           (setq ,j ,i))))
+
+
 (defun shift-number--replace-in-region (str beg end)
   "Utility to replace region from BEG to END with STR.
 Return the region replaced."
@@ -270,8 +276,17 @@ Otherwise search forward limited by LIMIT-END."
 (defun shift-number--on-region-impl (n region-beg region-end)
   "Shift the numbers N in the region defined.
 REGION-BEG & REGION-END define the region."
-  (let ((pos-old (point))
-        (pos-new nil))
+  (let* ((pos-beg-old (mark))
+         (pos-beg-new nil)
+         (pos-end-old (point))
+         (pos-end-new nil)
+         (point-is-first nil))
+
+    ;; Ensure order, mark then point.
+    (when (< pos-end-old pos-beg-old)
+      (setq point-is-first t)
+      (shift-number--swap-vars pos-end-old pos-beg-old))
+
     (save-excursion
       (let ((bounds-pair nil))
         (goto-char region-beg)
@@ -280,22 +295,38 @@ REGION-BEG & REGION-END define the region."
                  (new-bounds (cdr bounds-pair))
                  (old-beg (car old-bounds))
                  (old-end (cdr old-bounds))
+                 (new-beg (car new-bounds))
                  (new-end (cdr new-bounds))
                  (delta (- new-end old-end)))
 
             (when shift-number-motion
+              ;; Clamp the mark to the number beginning.
               (cond
-               ((<= pos-old old-beg)) ; NOP.
-               ((> pos-old old-end)
-                (setq pos-old (+ pos-old delta)))
+               ((<= pos-beg-old old-beg)) ; NOP.
+               ((> pos-beg-old old-end)
+                (setq pos-beg-old (+ pos-beg-old delta)))
                (t
-                (setq pos-new new-end))))
+                (setq pos-beg-new new-beg)))
+
+              ;; Clamp the point to the number end.
+              (cond
+               ((<= pos-end-old old-beg)) ; NOP.
+               ((> pos-end-old old-end)
+                (setq pos-end-old (+ pos-end-old delta)))
+               (t
+                (setq pos-end-new new-end))))
 
             ;; Keep contracting the region forward & updating it's end-points.
             (setq region-beg new-end)
             (setq region-end (+ region-end delta))))))
-    (when pos-new
-      (goto-char pos-new)))
+
+    (when point-is-first
+      (shift-number--swap-vars pos-end-new pos-beg-new))
+    (when pos-end-new
+      (goto-char pos-end-new))
+    (when pos-beg-new
+      (set-mark pos-beg-new)))
+
   region-end)
 
 (defun shift-number--on-region (n)
