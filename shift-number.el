@@ -267,18 +267,32 @@ Otherwise search forward limited by LIMIT-END."
 (defun shift-number--on-region-impl (n region-beg region-end)
   "Shift the numbers N in the region defined.
 REGION-BEG & REGION-END define the region."
-  (save-excursion
-    (let ((bounds-pair nil))
-      (goto-char region-beg)
-      (while (and (setq bounds-pair (shift-number--impl n region-beg region-beg region-end)))
-        (let* ((old-bounds (car bounds-pair))
-               (new-bounds (cdr bounds-pair))
-               (old-end (cdr old-bounds))
-               (new-end (cdr new-bounds)))
+  (let ((pos-old (point))
+        (pos-new nil))
+    (save-excursion
+      (let ((bounds-pair nil))
+        (goto-char region-beg)
+        (while (and (setq bounds-pair (shift-number--impl n region-beg region-beg region-end)))
+          (let* ((old-bounds (car bounds-pair))
+                 (new-bounds (cdr bounds-pair))
+                 (old-beg (car old-bounds))
+                 (old-end (cdr old-bounds))
+                 (new-end (cdr new-bounds))
+                 (delta (- new-end old-end)))
 
-          ;; Keep contracting the region forward & updating it's end-points.
-          (setq region-beg new-end)
-          (setq region-end (+ region-end (- new-end old-end)))))))
+            (when shift-number-motion
+              (cond
+               ((<= pos-old old-beg)) ; NOP.
+               ((> pos-old old-end)
+                (setq pos-old (+ pos-old delta)))
+               (t
+                (setq pos-new new-end))))
+
+            ;; Keep contracting the region forward & updating it's end-points.
+            (setq region-beg new-end)
+            (setq region-end (+ region-end delta))))))
+    (when pos-new
+      (goto-char pos-new)))
   region-end)
 
 (defun shift-number--on-region (n)
