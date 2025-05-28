@@ -40,7 +40,8 @@
   :type 'boolean)
 
 (defcustom shift-number-motion nil
-  "If non-nil, move the point to the end of the number."
+  "If non-nil, move the point to the end of the number.
+The `mark' is set the the beginning of the number."
   :type 'boolean)
 
 (declare-function apply-on-rectangle "rect")
@@ -246,6 +247,7 @@ Otherwise search forward limited by LIMIT-END."
     (let* ((old-bounds (car bounds-pair))
            (new-bounds (cdr bounds-pair))
            (old-end (cdr old-bounds))
+           (new-beg (car new-bounds))
            (new-end (cdr new-bounds)))
 
       (cond
@@ -260,6 +262,7 @@ Otherwise search forward limited by LIMIT-END."
       (goto-char old-pos)
 
       (when shift-number-motion
+        (set-mark new-beg)
         (goto-char new-end))
 
       new-end)))
