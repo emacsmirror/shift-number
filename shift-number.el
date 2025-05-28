@@ -135,7 +135,9 @@ Otherwise search forward limited by LIMIT-END."
   ;; the beginning of the number.  Instead, the point is saved and
   ;; restored later.
   (let ((num-bounds nil)
-        (has-sign nil))
+        (has-sign nil)
+        ;; Allow numbers to become negative.
+        (use-sign shift-number-negative))
 
     (save-match-data
       (when (or (and (< limit-beg pos)
@@ -146,7 +148,7 @@ Otherwise search forward limited by LIMIT-END."
           (setq num-bounds (cons beg end))
 
           ;; Only detect a sign when negative numbers are supported.
-          (when (and shift-number-negative (< limit-beg beg))
+          (when (and use-sign (< limit-beg beg))
             (let ((ch (char-before beg)))
               (cond
                ((eq ?- ch)
@@ -154,12 +156,15 @@ Otherwise search forward limited by LIMIT-END."
                ((eq ?+ ch)
                 (setq has-sign t)))
 
+              ;; Ignore the sign when immediately preceded by a number, e.g. `123-456'.
               (when has-sign
-                (cond
-                 ((eq ?- ch)
-                  -1)
-                 (t
-                  1))))))))
+                (save-excursion
+                  (goto-char (1- beg))
+                  (when (looking-back shift-number-regexp limit-beg)
+                    ;; Don't allow negative numbers otherwise
+                    ;; `1-0' would subtract zero to make `1--0'.
+                    (setq use-sign nil)
+                    (setq has-sign nil)))))))))
 
     (cond
      (num-bounds
@@ -167,9 +172,9 @@ Otherwise search forward limited by LIMIT-END."
              (end (cdr num-bounds))
              ;; Take care, nil when negative unsupported.
              (old-sign
-              (and shift-number-negative
+              (and use-sign
                    (cond
-                    ((eq ?- (char-before beg))
+                    ((and has-sign (eq ?- (char-before beg)))
                      -1)
                     (t
                      1))))
@@ -186,7 +191,7 @@ Otherwise search forward limited by LIMIT-END."
              (old-num (string-to-number old-num-str))
              (new-num
               (cond
-               (shift-number-negative
+               (use-sign
                 (+ old-num (* old-sign n)))
                (t
                 ;; It doesn't make sense to add a "sign" if further increments ignore it.
@@ -198,7 +203,7 @@ Otherwise search forward limited by LIMIT-END."
              (new-num-str (number-to-string (abs new-num))))
 
         ;; Handle sign flipping & negative numbers.
-        (when shift-number-negative
+        (when use-sign
           (when (< new-num 0)
             (setq new-sign (- old-sign)))
 
