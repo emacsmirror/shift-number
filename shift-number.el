@@ -57,6 +57,7 @@ The `mark' is set the the beginning of the number."
 ;; Private Functions
 
 (defmacro shift-number--swap-vars (i j)
+  "Swap the value of I & J."
   `(setq ,i
          (prog1 ,j
            (setq ,j ,i))))
