@@ -213,8 +213,14 @@ Otherwise search forward limited by LIMIT-END."
 
         ;; Handle sign flipping & negative numbers.
         (when use-sign
-          (when (< new-num 0)
+          (cond
+           ((< new-num 0)
             (setq new-sign (- old-sign)))
+           ;; Without this check -1 would increase to -0.
+           ;; While technically correct, it's not desirable.
+           ((zerop new-num)
+            (when (eq old-sign -1)
+              (setq new-sign 1))))
 
           (cond
            ((eq new-sign -1)
