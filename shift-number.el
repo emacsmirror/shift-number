@@ -345,9 +345,16 @@ REGION-BEG & REGION-END define the region."
   (let ((shift-fn `(lambda (beg end) (save-excursion (shift-number--on-region-impl ,n beg end)))))
     (apply-on-rectangle
      ;; Make the values global.
-     `(lambda (beg end) (funcall ,shift-fn (+ (point) beg) (+ (point) end)))
-     (region-beginning)
-     (region-end))))
+     `(lambda (col-beg col-end)
+        (let ((beg nil)
+              (end nil))
+          (save-excursion
+            (move-to-column col-beg)
+            (setq beg (point))
+            (move-to-column col-end)
+            (setq end (point)))
+          (funcall ,shift-fn beg end)))
+     (region-beginning) (region-end))))
 
 (defun shift-number--on-context (n)
   "Manipulate numbers in the current region or line by N."
