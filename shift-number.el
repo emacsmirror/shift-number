@@ -29,6 +29,23 @@
 
 
 ;; ---------------------------------------------------------------------------
+;; Compatibility
+
+(eval-when-compile
+  (when (version< emacs-version "31.1")
+    (defmacro incf (place &optional delta)
+      "Increment PLACE by DELTA or 1."
+      (declare (debug (gv-place &optional form)))
+      (gv-letplace (getter setter) place
+        (funcall setter `(+ ,getter ,(or delta 1)))))
+    (defmacro decf (place &optional delta)
+      "Decrement PLACE by DELTA or 1."
+      (declare (debug (gv-place &optional form)))
+      (gv-letplace (getter setter) place
+        (funcall setter `(- ,getter ,(or delta 1)))))))
+
+
+;; ---------------------------------------------------------------------------
 ;; Custom Variables
 
 (defgroup shift-number nil
@@ -85,8 +102,8 @@ Return the region replaced."
               (setq len-test i))))))
       (unless (zerop i)
         (setq i-end (- len i))
-        (setq len (- len i))
-        (setq end (- end i))
+        (decf len i)
+        (decf end i)
         (setq i-end-ofs i)))
 
     ;; Check for skip start.
@@ -95,12 +112,12 @@ Return the region replaced."
         (while (< i len-test)
           (cond
            ((eq (aref str i) (char-after (+ beg i)))
-            (setq i (1+ i)))
+            (incf i))
            (t ; Break.
             (setq len-test i)))))
       (unless (zerop i)
         (setq i-beg i)
-        (setq beg (+ beg i))))
+        (incf beg i)))
 
     (when (or i-beg i-end)
       (setq str (substring str (or i-beg 0) (or i-end len))))
@@ -311,7 +328,7 @@ REGION-BEG & REGION-END define the region."
               (cond
                ((<= pos-beg-old old-beg)) ; NOP.
                ((> pos-beg-old old-end)
-                (setq pos-beg-old (+ pos-beg-old delta)))
+                (incf pos-beg-old delta))
                (t
                 (setq pos-beg-new new-beg)))
 
@@ -319,13 +336,13 @@ REGION-BEG & REGION-END define the region."
               (cond
                ((<= pos-end-old old-beg)) ; NOP.
                ((> pos-end-old old-end)
-                (setq pos-end-old (+ pos-end-old delta)))
+                (incf pos-end-old delta))
                (t
                 (setq pos-end-new new-end))))
 
             ;; Keep contracting the region forward & updating it's end-points.
             (setq region-beg new-end)
-            (setq region-end (+ region-end delta))))))
+            (incf region-end delta)))))
 
     (when point-is-first
       (shift-number--swap-vars pos-end-new pos-beg-new))
