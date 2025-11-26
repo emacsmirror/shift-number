@@ -141,7 +141,7 @@ Return the region replaced."
     (let ((found nil)
           (exit nil))
       (goto-char limit-beg)
-      (while (and (not (or exit found)) (re-search-forward regexp limit-end t))
+      (while (and (null (or exit found)) (re-search-forward regexp limit-end t))
         (cond
          ((> (match-beginning 0) pos)
           (setq exit t))
