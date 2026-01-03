@@ -568,7 +568,7 @@ The minus sign is ignored, so -5 is treated as 5, decrementing gives 4, result i
   "Check that only numbers within the region are modified.
 The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
   (let ((text-initial "1 2 3 4 5")
-        (text-expected "1 3 4 |4 5"))
+        (text-expected "1 3 |4 4 5"))
     (with-shift-number-test text-initial
       (transient-mark-mode 1)
       (goto-char 3) ; Position before '2'.
@@ -594,7 +594,7 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
 (ert-deftest region-mixed-signs ()
   "Check that region with mixed positive and negative numbers works."
   (let ((text-initial "-5 0 +5")
-        (text-expected "-4 1 +|6"))
+        (text-expected "-4 1 |+6"))
     (with-shift-number-test text-initial
       (transient-mark-mode 1)
       (goto-char (point-min))
@@ -626,9 +626,10 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
       (should (equal text-expected (buffer-string))))))
 
 (ert-deftest region-reversed ()
-  "Check that region works when mark is after point."
+  "Check that region works when mark is after point.
+Cursor ends on last modified number regardless of selection direction."
   (let ((text-initial "1 2 3")
-        (text-expected "|2 3 4"))
+        (text-expected "2 3 |4"))
     (with-shift-number-test text-initial
       (transient-mark-mode 1)
       (goto-char (point-max))
@@ -676,7 +677,7 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
          ;; format-next-line: off
          (concat "-4 0\n"
                  "-4 0\n"
-                 "-|4 0")))
+                 "|-4 0")))
     (with-shift-number-test text-initial
       (transient-mark-mode 1)
       (goto-char (point-min))
@@ -762,15 +763,257 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
       (cursor-marker)
       (should (equal text-expected (buffer-string))))))
 
+(ert-deftest rectangle-with-motion ()
+  "Check rectangle mode works with shift-number-motion enabled."
+  (let ((text-initial
+         ;; format-next-line: off
+         (concat "1 0 0\n"
+                 "1 0 0\n"
+                 "1 0 0"))
+        (text-expected
+         ;; format-next-line: off
+         (concat "2 0 0\n"
+                 "2 0 0\n"
+                 "2| 0 0"))
+        (shift-number-motion t))
+    (with-shift-number-test text-initial
+      (transient-mark-mode 1)
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (backward-char 4) ; Position at column 0 of last line.
+      (rectangle-mark-mode 1)
+      (shift-number-up 1)
+      (rectangle-mark-mode 0)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Incremental Mode Tests
+
+(ert-deftest incremental-no-mark-error ()
+  "Check that incremental mode signals error when mark is not set."
+  (with-shift-number-test "0 0 0"
+    (should-error-with-message
+        (shift-number-up-incremental 1)
+      'user-error
+      "The mark is not set")))
+
+(ert-deftest incremental-without-active-region ()
+  "Check that incremental mode works without an active region.
+Only the mark needs to be set."
+  (let ((text-initial "0 0 0")
+        (text-expected "1 2 |3"))
+    (with-shift-number-test text-initial
+      ;; Set mark but don't activate region.
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      ;; Region is not active, but incremental should still work.
+      (shift-number-up-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-region-by-amount ()
+  "Check that incremental mode respects the amount argument."
+  (let ((text-initial "0 0 0")
+        (text-expected "2 4 |6"))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (shift-number-up-incremental 2)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-region-down ()
+  "Check that incremental decrement works."
+  (let ((text-initial "10 10 10")
+        (text-expected "9 8 |7"))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (shift-number-down-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-region-multiline ()
+  "Check that incremental mode works across multiple lines."
+  (let ((text-initial
+         ;; format-next-line: off
+         (concat "0 0 0\n"
+                 "0 0 0\n"
+                 "0 0 0"))
+        (text-expected
+         ;; format-next-line: off
+         (concat "1 2 3\n"
+                 "4 5 6\n"
+                 "7 8 |9")))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (shift-number-up-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-rectangle ()
+  "Check that incremental mode works with rectangle selection."
+  (let ((text-initial
+         ;; format-next-line: off
+         (concat "0 0 0\n"
+                 "0 0 0\n"
+                 "0 0 0"))
+        (text-expected
+         ;; format-next-line: off
+         (concat "1 0 0\n"
+                 "2 0 0\n"
+                 "|3 0 0")))
+    (with-shift-number-test text-initial
+      (transient-mark-mode 1)
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (backward-char 4) ; Position at column 0 of last line.
+      (rectangle-mark-mode 1)
+      (shift-number-up-incremental 1)
+      (rectangle-mark-mode 0)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-rectangle-multicolumn ()
+  "Check that incremental count continues across rectangle cells.
+Cursor ends on the last number modified (highest increment)."
+  (let ((text-initial
+         ;; format-next-line: off
+         (concat "0 0\n"
+                 "0 0\n"
+                 "0 0"))
+        (text-expected
+         ;; format-next-line: off
+         (concat "1 2\n"
+                 "3 4\n"
+                 "5 |6")))
+    (with-shift-number-test text-initial
+      (transient-mark-mode 1)
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (rectangle-mark-mode 1)
+      (shift-number-up-incremental 1)
+      (rectangle-mark-mode 0)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-direction-reversed ()
+  "Check that incremental direction reverses when point is before mark.
+With point before mark, 0 0 0 becomes 3 2 1 instead of 1 2 3."
+  (let ((text-initial "0 0 0")
+        (text-expected "|3 2 1")
+        (shift-number-incremental-direction-from-region t))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point-max))
+      (shift-number-up-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-direction-forward ()
+  "Check that incremental direction is forward when point is after mark.
+With point after mark, 0 0 0 becomes 1 2 3 (standard behavior)."
+  (let ((text-initial "0 0 0")
+        (text-expected "1 2 |3")
+        (shift-number-incremental-direction-from-region t))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (shift-number-up-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-direction-disabled ()
+  "Check that direction is always forward when option is disabled."
+  (let ((text-initial "0 0 0")
+        (text-expected "1 2 |3")
+        (shift-number-incremental-direction-from-region nil))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point-max))
+      ;; Point is before mark, but option is disabled so direction is forward.
+      (shift-number-up-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-direction-reversed-down ()
+  "Check that reversed direction works with shift-number-down-incremental."
+  (let ((text-initial "10 10 10")
+        (text-expected "|7 8 9")
+        (shift-number-incremental-direction-from-region t))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point-max))
+      (shift-number-down-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-direction-reversed-multiline ()
+  "Check that reversed direction works across multiple lines."
+  (let ((text-initial
+         ;; format-next-line: off
+         (concat "0 0 0\n"
+                 "0 0 0\n"
+                 "0 0 0"))
+        (text-expected
+         ;; format-next-line: off
+         (concat "|9 8 7\n"
+                 "6 5 4\n"
+                 "3 2 1"))
+        (shift-number-incremental-direction-from-region t))
+    (with-shift-number-test text-initial
+      (goto-char (point-min))
+      (set-mark (point-max))
+      (shift-number-up-incremental 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest incremental-direction-reversed-rectangle ()
+  "Check that reversed direction works with rectangle selection."
+  (let ((text-initial
+         ;; format-next-line: off
+         (concat "0 0 0\n"
+                 "0 0 0\n"
+                 "0 0 0"))
+        (text-expected
+         ;; format-next-line: off
+         (concat "|3 0 0\n"
+                 "2 0 0\n"
+                 "1 0 0"))
+        (shift-number-incremental-direction-from-region t))
+    (with-shift-number-test text-initial
+      (transient-mark-mode 1)
+      ;; Set mark at end of last line (column 0), point at start (column 0).
+      ;; Point is before mark, so direction is reversed.
+      (goto-char (point-max))
+      (backward-char 4) ; Position at column 0 of last line.
+      (set-mark (point))
+      (goto-char (point-min))
+      (rectangle-mark-mode 1)
+      (shift-number-up-incremental 1)
+      (rectangle-mark-mode 0)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
 ;; ---------------------------------------------------------------------------
 ;; Motion Tests
 
 (ert-deftest motion-enabled ()
-  "Check that shift-number-motion moves cursor and sets mark at number start."
+  "Check that shift-number-motion mark moves cursor and sets mark at number start."
   (let ((text-initial "abc 123 def")
         (text-expected "abc 124| def")
         (mark-expected 5) ; Position of "124".
-        (shift-number-motion t))
+        (shift-number-motion 'mark))
     (with-shift-number-test text-initial
       (shift-number-up 1)
       (cursor-marker)
@@ -778,11 +1021,11 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
       (should (equal mark-expected (mark))))))
 
 (ert-deftest motion-enabled-down ()
-  "Check that shift-number-motion works with shift-number-down."
+  "Check that shift-number-motion mark works with shift-number-down."
   (let ((text-initial "abc 123 def")
         (text-expected "abc 122| def")
         (mark-expected 5) ; Position of "122".
-        (shift-number-motion t))
+        (shift-number-motion 'mark))
     (with-shift-number-test text-initial
       (shift-number-down 1)
       (cursor-marker)
@@ -790,11 +1033,11 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
       (should (equal mark-expected (mark))))))
 
 (ert-deftest motion-enabled-region ()
-  "Check that shift-number-motion works with region operations."
+  "Check that shift-number-motion mark works with region operations."
   (let ((text-initial "1 2 3")
         (text-expected "2 3 4|")
         (mark-expected 1) ; Position of "2" (first number in region).
-        (shift-number-motion t))
+        (shift-number-motion 'mark))
     (with-shift-number-test text-initial
       (transient-mark-mode 1)
       (goto-char (point-min))
@@ -1007,15 +1250,6 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
       (cursor-marker)
       (should (equal text-expected (buffer-string))))))
 
-(ert-deftest hexadecimal-prefix ()
-  "Check that hexadecimal prefix is treated as separate number."
-  (let ((text-initial "0x10")
-        (text-expected "|1x10"))
-    (with-shift-number-test text-initial
-      (shift-number-up 1)
-      (cursor-marker)
-      (should (equal text-expected (buffer-string))))))
-
 (ert-deftest multiple-decimal-points ()
   "Check behavior with multiple decimal points like version numbers."
   (let ((text-initial "1.2.3")
@@ -1088,6 +1322,508 @@ The 1 is unchanged, 2 becomes 3, 3 becomes 4, original 4 and 5 unchanged."
         (text-expected "1\t|3\t3"))
     (with-shift-number-test text-initial
       (forward-char 2) ; Position cursor on '2'.
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Binary Literal Tests
+
+(ert-deftest binary-increment ()
+  "Check that binary literal increments correctly."
+  (let ((text-initial "0b101")
+        (text-expected "|0b110"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest binary-decrement ()
+  "Check that binary literal decrements correctly."
+  (let ((text-initial "0b110")
+        (text-expected "|0b101"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest binary-uppercase-prefix ()
+  "Check that uppercase 0B prefix is preserved."
+  (let ((text-initial "0B101")
+        (text-expected "|0B110"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest binary-padding-preserved ()
+  "Check that binary padding is preserved."
+  (let ((text-initial "0b0001")
+        (text-expected "|0b0010"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest binary-to-zero ()
+  "Check that binary can decrement to zero."
+  (let ((text-initial "0b1")
+        (text-expected "|0b0"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest binary-negative ()
+  "Check that negative binary literal works."
+  (let ((text-initial "-0b101")
+        (text-expected "|-0b110"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest binary-to-negative ()
+  "Check that binary can decrement below zero."
+  (let ((text-initial "0b0")
+        (text-expected "|-0b1"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Octal Literal Tests
+
+(ert-deftest octal-increment ()
+  "Check that octal literal increments correctly."
+  (let ((text-initial "0o42")
+        (text-expected "|0o43"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest octal-decrement ()
+  "Check that octal literal decrements correctly."
+  (let ((text-initial "0o43")
+        (text-expected "|0o42"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest octal-uppercase-prefix ()
+  "Check that uppercase 0O prefix is preserved."
+  (let ((text-initial "0O755")
+        (text-expected "|0O756"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest octal-wrap-digit ()
+  "Check that octal wraps from 7 to 10."
+  (let ((text-initial "0o7")
+        (text-expected "|0o10"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest octal-padding-preserved ()
+  "Check that octal padding is preserved."
+  (let ((text-initial "0o007")
+        (text-expected "|0o010"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest octal-negative ()
+  "Check that negative octal literal works."
+  (let ((text-initial "-0o77")
+        (text-expected "|-0o100"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest octal-to-negative ()
+  "Check that octal can decrement below zero."
+  (let ((text-initial "0o0")
+        (text-expected "|-0o1"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Hexadecimal Literal Tests
+
+(ert-deftest hex-increment ()
+  "Check that hexadecimal literal increments correctly."
+  (let ((text-initial "0xBEEF")
+        (text-expected "|0xBEF0"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-decrement ()
+  "Check that hexadecimal literal decrements correctly."
+  (let ((text-initial "0xBEF0")
+        (text-expected "|0xBEEF"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-lowercase ()
+  "Check that lowercase hex is preserved."
+  (let ((text-initial "0xcafe")
+        (text-expected "|0xcaff"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-uppercase-prefix ()
+  "Check that uppercase 0X prefix is preserved."
+  (let ((text-initial "0X10")
+        (text-expected "|0X11"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-padding-preserved ()
+  "Check that hex padding is preserved."
+  (let ((text-initial "0x00FF")
+        (text-expected "|0x0100"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-wrap-f-to-10 ()
+  "Check that hex F wraps to 10."
+  (let ((text-initial "0xF")
+        (text-expected "|0x10"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-case-upcase ()
+  "Check that shift-number-case upcase forces uppercase."
+  (let ((text-initial "0xcafe")
+        (text-expected "|0xCAFF")
+        (shift-number-case 'upcase))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-case-downcase ()
+  "Check that shift-number-case downcase forces lowercase."
+  (let ((text-initial "0xCAFE")
+        (text-expected "|0xcaff")
+        (shift-number-case 'downcase))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-case-nil-preserves ()
+  "Check that shift-number-case nil preserves original case."
+  (let ((text-initial "0xCaFe")
+        (text-expected "|0xcaff")
+        (shift-number-case nil))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-negative ()
+  "Check that negative hex literal works."
+  (let ((text-initial "-0xFF")
+        (text-expected "|-0x100"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest hex-to-negative ()
+  "Check that hex can decrement below zero."
+  (let ((text-initial "0x0")
+        (text-expected "|-0x1"))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Superscript Number Tests
+
+(ert-deftest superscript-increment ()
+  "Check that superscript number increments correctly."
+  (let ((text-initial "x⁴²")
+        (text-expected "x|⁴³"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest superscript-decrement ()
+  "Check that superscript number decrements correctly."
+  (let ((text-initial "x⁴³")
+        (text-expected "x|⁴²"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest superscript-negative ()
+  "Check that negative superscript works."
+  (let ((text-initial "x⁻¹")
+        (text-expected "x|⁻²"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest superscript-to-negative ()
+  "Check that superscript can become negative."
+  (let ((text-initial "x⁰")
+        (text-expected "x|⁻¹"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest superscript-single-digit ()
+  "Check that single digit superscript works."
+  (let ((text-initial "²")
+        (text-expected "|³"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest superscript-positive-sign ()
+  "Check that positive superscript sign works."
+  (let ((text-initial "x⁺¹")
+        (text-expected "x|⁺²"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Subscript Number Tests
+
+(ert-deftest subscript-increment ()
+  "Check that subscript number increments correctly."
+  (let ((text-initial "H₂O")
+        (text-expected "H|₃O"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest subscript-decrement ()
+  "Check that subscript number decrements correctly."
+  (let ((text-initial "H₃O")
+        (text-expected "H|₂O"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest subscript-negative ()
+  "Check that negative subscript works."
+  (let ((text-initial "x₋₁")
+        (text-expected "x|₋₂"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest subscript-multi-digit ()
+  "Check that multi-digit subscript works."
+  (let ((text-initial "C₁₂H₂₂O₁₁")
+        (text-expected "C|₁₃H₂₂O₁₁"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest subscript-positive-sign ()
+  "Check that positive subscript sign works."
+  (let ((text-initial "x₊₁")
+        (text-expected "x|₊₂"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest subscript-to-negative ()
+  "Check that subscript can decrement below zero."
+  (let ((text-initial "x₀")
+        (text-expected "x|₋₁"))
+    (with-shift-number-test text-initial
+      (forward-char 1)
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Separator Characters Tests
+
+(ert-deftest separator-underscore-enabled ()
+  "Check that underscore separator is treated as part of number when enabled."
+  (let ((text-initial "1_000_000")
+        (text-expected "|1_000_001")
+        (shift-number-separator-chars "_"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest separator-underscore-large-increment ()
+  "Check that underscore-separated number increments by large amount."
+  (let ((text-initial "1_000_000")
+        (text-expected "|2_000_000")
+        (shift-number-separator-chars "_"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1000000)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest separator-comma-enabled ()
+  "Check that comma separator is treated as part of number when enabled."
+  (let ((text-initial "1,000,000")
+        (text-expected "|1,000,001")
+        (shift-number-separator-chars ","))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest separator-disabled ()
+  "Check that separator is not recognized when disabled."
+  (let ((text-initial "1_000")
+        (text-expected "|2_000")
+        (shift-number-separator-chars nil))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest separator-hex-underscore ()
+  "Check that underscore separator works with hex literals.
+Separator position is preserved relative to the end of the number."
+  (let ((text-initial "0xFF_FF")
+        (text-expected "|0x100_00")
+        (shift-number-separator-chars "_"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest separator-binary-underscore ()
+  "Check that underscore separator works with binary literals."
+  (let ((text-initial "0b1111_1111")
+        (text-expected "|0b10000_0000")
+        (shift-number-separator-chars "_"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest separator-octal-underscore ()
+  "Check that underscore separator works with octal literals."
+  (let ((text-initial "0o77_77")
+        (text-expected "|0o100_00")
+        (shift-number-separator-chars "_"))
+    (with-shift-number-test text-initial
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Padding Default Option Tests
+
+(ert-deftest pad-default-enabled ()
+  "Check that shift-number-pad-default preserves width when number shrinks."
+  (let ((text-initial "10")
+        (text-expected "|09")
+        (shift-number-pad-default t))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest pad-default-disabled ()
+  "Check that shift-number-pad-default disabled doesn't pad."
+  (let ((text-initial "9")
+        (text-expected "|8")
+        (shift-number-pad-default nil))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+(ert-deftest pad-default-leading-zeros-always-pad ()
+  "Check that leading zeros are preserved regardless of pad-default."
+  (let ((text-initial "09")
+        (text-expected "|08")
+        (shift-number-pad-default nil))
+    (with-shift-number-test text-initial
+      (shift-number-down 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string))))))
+
+;; ---------------------------------------------------------------------------
+;; Region Cursor Position Tests
+
+(ert-deftest region-cursor-with-motion ()
+  "Check that shift-number-motion t positions cursor at end without mark."
+  (let ((text-initial "1 2 3")
+        (text-expected "2 3 4|")
+        (shift-number-motion t))
+    (with-shift-number-test text-initial
+      (transient-mark-mode 1)
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
+      (shift-number-up 1)
+      (cursor-marker)
+      (should (equal text-expected (buffer-string)))
+      ;; Mark should not be changed to number position.
+      (should (equal 1 (mark))))))
+
+(ert-deftest region-cursor-without-motion ()
+  "Check that cursor is at beginning of last number when motion is nil."
+  (let ((text-initial "1 2 3")
+        (text-expected "2 3 |4")
+        (shift-number-motion nil))
+    (with-shift-number-test text-initial
+      (transient-mark-mode 1)
+      (goto-char (point-min))
+      (set-mark (point))
+      (goto-char (point-max))
       (shift-number-up 1)
       (cursor-marker)
       (should (equal text-expected (buffer-string))))))
