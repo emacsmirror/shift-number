@@ -108,7 +108,7 @@ Custom Variables
 
    - ``nil``: cursor stays at beginning of number, mark unchanged.
    - ``t``: cursor moves to end of number, mark unchanged.
-   - ``mark``: cursor moves to end of number, mark set to beginning.
+   - ``'mark``: cursor moves to end of number, mark set to beginning.
 
 ``shift-number-pad-default``: ``nil``
    When non-nil, preserve the number's width when it shrinks
@@ -121,9 +121,9 @@ Custom Variables
 ``shift-number-case``: ``nil``
    Case to use for hexadecimal numbers. Options are:
 
-   - ``nil``: preserve current case
-   - ``upcase``: use upper case (A-F)
-   - ``downcase``: use lower case (a-f)
+   - ``nil``: preserve current case.
+   - ``'upcase``: use upper case (A-F).
+   - ``'downcase``: use lower case (a-f).
 
 ``shift-number-incremental-direction-from-region``: ``t``
    When non-nil, reverse incremental direction when point is before mark.
