@@ -930,7 +930,8 @@ Works with rectangle selection when `rectangle-mark-mode' is active."
 PREV is the cached cumulative amount (0 on the first call).  ID is the
 chain identifier."
   (cond
-   (shift-number-redo
+   ;; Skip the chain when undo is disabled in this buffer.
+   ((and shift-number-redo (not (eq buffer-undo-list t)))
     (with-command-redo-fn
      (list :id id)
      (lambda (props)
