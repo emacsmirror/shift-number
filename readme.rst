@@ -130,6 +130,13 @@ Custom Variables
    With point before mark, ``shift-number-up-incremental`` on ``0 0 0``
    produces ``3 2 1`` instead of ``1 2 3``.
 
+``shift-number-redo``: ``nil``
+   When non-nil, repeated shift-number commands add only one entry to the
+   undo history for the whole run, keeping it free of noise.
+
+   Requires the `with-command-redo <https://codeberg.org/ideasman42/emacs-with-command-redo>`__
+   package to be installed.
+
 
 Related packages
 ================

@@ -106,7 +106,14 @@ With point before mark, `shift-number-up-incremental' on \"0 0 0\"
 produces \"3 2 1\" instead of \"1 2 3\"."
   :type 'boolean)
 
+(defcustom shift-number-redo nil
+  "When non-nil, repeated shift-number commands add only one undo entry.
+Requires the `with-command-redo' package."
+  :type 'boolean)
+
 (declare-function apply-on-rectangle "rect")
+;; Used when `shift-number-redo' is enabled.
+(declare-function with-command-redo-fn "with-command-redo")
 
 
 ;; ---------------------------------------------------------------------------
@@ -918,6 +925,21 @@ Works with rectangle selection when `rectangle-mark-mode' is active."
      (t
       (shift-number--on-region-impl n (region-beginning) (region-end) t dir 1)))))
 
+(defun shift-number--maybe-redo (id delta-fn op-fn)
+  "Apply (OP-FN (DELTA-FN prev)), optionally inside a `with-command-redo' chain.
+PREV is the cached cumulative amount (0 on the first call).  ID is the
+chain identifier."
+  (cond
+   (shift-number-redo
+    (with-command-redo-fn
+     (list :id id)
+     (lambda (props)
+       (let ((amount (funcall delta-fn (or (plist-get props :cache) 0))))
+         (plist-put props :cache amount)
+         (funcall op-fn amount)))))
+   (t
+    (funcall op-fn (funcall delta-fn 0)))))
+
 
 ;; ---------------------------------------------------------------------------
 ;; Public Functions
@@ -926,13 +948,13 @@ Works with rectangle selection when `rectangle-mark-mode' is active."
 (defun shift-number-up (&optional arg)
   "Increase the number at point (or on the current line) by ARG."
   (interactive "*p")
-  (shift-number--on-context arg))
+  (shift-number--maybe-redo 'shift-number (lambda (prev) (+ prev arg)) #'shift-number--on-context))
 
 ;;;###autoload
 (defun shift-number-down (&optional arg)
   "Decrease the number at point (or on the current line) by ARG."
   (interactive "*p")
-  (shift-number--on-context (- arg)))
+  (shift-number--maybe-redo 'shift-number (lambda (prev) (- prev arg)) #'shift-number--on-context))
 
 ;;;###autoload
 (defun shift-number-up-incremental (&optional arg)
@@ -940,7 +962,8 @@ Works with rectangle selection when `rectangle-mark-mode' is active."
 The first number is increased by ARG, the second by 2*ARG, etc.
 Works with rectangle selection when `rectangle-mark-mode' is active."
   (interactive "*p")
-  (shift-number--on-context-incremental arg))
+  (shift-number--maybe-redo
+   'shift-number-incremental (lambda (prev) (+ prev arg)) #'shift-number--on-context-incremental))
 
 ;;;###autoload
 (defun shift-number-down-incremental (&optional arg)
@@ -948,7 +971,8 @@ Works with rectangle selection when `rectangle-mark-mode' is active."
 The first number is decreased by ARG, the second by 2*ARG, etc.
 Works with rectangle selection when `rectangle-mark-mode' is active."
   (interactive "*p")
-  (shift-number--on-context-incremental (- arg)))
+  (shift-number--maybe-redo
+   'shift-number-incremental (lambda (prev) (- prev arg)) #'shift-number--on-context-incremental))
 
 ;;;###autoload
 (defun shift-number-increment-at-point-with-search (&rest args)
