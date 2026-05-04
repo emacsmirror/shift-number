@@ -1,7 +1,7 @@
 ;;; shift-number.el --- Increase/decrease the number at point -*- lexical-binding: t -*-
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
-;; Copyright (c) 2016–2017 Alex Kost
+;; Copyright (c) 2025-2026 Free Software Foundation, Inc.
 
 ;; Author: Alex Kost <alezost@gmail.com>
 
