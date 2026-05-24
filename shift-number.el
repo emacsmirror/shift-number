@@ -4,11 +4,11 @@
 ;; Copyright (c) 2025-2026 Free Software Foundation, Inc.
 
 ;; Author: Alex Kost <alezost@gmail.com>
-
+;; Maintainer: Campbell Barton <ideasman42@gmail.com>
 ;; URL: https://codeberg.org/ideasman42/emacs-shift-number
 ;; Keywords: convenience
 ;; Created: 12 Apr 2016
-;; Version: 0.2
+;; Version: 0.3
 ;; Package-Requires: ((emacs "28.1"))
 
 ;;; Commentary:
